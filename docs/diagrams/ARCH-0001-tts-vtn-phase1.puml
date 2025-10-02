@@ -1,0 +1,35 @@
+@startuml ARCH-0001-tts-vtn-phase1
+' Sequence diagram: từ tạo Job đến nhận progress & tải file
+skinparam monochrome true
+skinparam Shadowing false
+skinparam sequenceArrowThickness 1
+
+actor User as U
+participant "React SPA\n(Frontend)" as FE
+participant "Nest API\n(REST + SSE)" as API
+queue "Redis\n(BullMQ + Pub/Sub)" as R
+participant "Python Worker\n(Piper/XTTS + PostFX + QC)" as WK
+database "Storage\n(FS/MinIO/S3)" as ST
+
+U -> FE: Tạo Block, bấm "Tạo âm thanh (Async)"
+FE -> API: POST /blocks/{id}/job (engine, rows, params)
+API -> R: Enqueue block_job
+note right of R: attempts=2, backoff=2s\nremoveOnComplete=true
+
+FE -> API: GET /jobs/{id}/stream (SSE subscribe)
+...
+R -> WK: Dequeue block_job
+WK -> WK: Fan-out Row, synth (Piper|XTTS)
+WK -> WK: PostFX (normalize/limit) + QC (LUFS/Peak/Clip)
+WK -> ST: Write row audio + qc metrics
+WK -> R: Publish progress: {rowId, state, metrics}
+R -> API: progress:jobId events
+API -> FE: SSE event: {rowIndex, state, metrics}
+...
+WK -> ST: Mix per-Block, export WAV/MP3 + manifest
+WK -> R: Publish final status
+API -> FE: SSE event: {state=done, manifest}
+FE -> API: GET /files/{key} (preview/output)
+API -> ST: Signed or internal link
+ST --> FE: Audio file
+@enduml

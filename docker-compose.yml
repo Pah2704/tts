@@ -1,0 +1,44 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  api:
+    build: ./apps/api
+    working_dir: /app
+    environment:
+      - PORT=4000
+      - REDIS_URL=redis://redis:6379
+    ports: ["4000:4000"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: ./apps/worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=5001
+    ports: ["5001:5001"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./apps/frontend
+    environment:
+      - VITE_API_URL=http://localhost:4000
+    ports: ["3000:3000"]
+    depends_on:
+      - api
+    restart: unless-stopped
+
