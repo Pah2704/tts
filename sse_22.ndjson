@@ -1,0 +1,7 @@
+{"type":"row","state":"running","rowIndex":0,"total":3}
+{"type":"row","state":"done","rowIndex":0,"total":3,"fileKey":"blocks/6330b166-ef17-4fc4-8514-760f610efe2f/rows/000_3c6ef055-4861-49b7-b3ab-a7f335f5c937.wav","bytes":47148,"durationMs":1068,"metrics":{"lufsIntegrated":-16,"truePeakDb":-7.74,"clippingPct":0,"score":1,"warnings":[],"normalizer":{"appliedGainDb":-7.74,"postTruePeakDb":-7.74,"postLufs":-16}}}
+{"type":"row","state":"running","rowIndex":1,"total":3}
+{"type":"row","state":"done","rowIndex":1,"total":3,"fileKey":"blocks/6330b166-ef17-4fc4-8514-760f610efe2f/rows/001_808f96e0-e605-46ee-a4d1-924a5a28ab6d.wav","bytes":138284,"durationMs":3134,"metrics":{"lufsIntegrated":-16,"truePeakDb":-6.11,"clippingPct":0,"score":1,"warnings":[],"normalizer":{"appliedGainDb":-6.11,"postTruePeakDb":-6.11,"postLufs":-16}}}
+{"type":"row","state":"running","rowIndex":2,"total":3}
+{"type":"row","state":"done","rowIndex":2,"total":3,"fileKey":"blocks/6330b166-ef17-4fc4-8514-760f610efe2f/rows/002_9ac8b68c-1ba0-472c-a0df-d01477b00b1b.wav","bytes":89132,"durationMs":2020,"metrics":{"lufsIntegrated":-16,"truePeakDb":-8.41,"clippingPct":0,"score":1,"warnings":[],"normalizer":{"appliedGainDb":-8.41,"postTruePeakDb":-8.41,"postLufs":-16}}}
+{"type":"final","state":"done","manifestKey":"blocks/6330b166-ef17-4fc4-8514-760f610efe2f/manifest.json","qcSummary":{"rowsPass":3,"rowsFail":0,"blockLufs":-16,"blockTruePeakDb":-6.11,"blockClippingPct":0},"mergedKey":"blocks/6330b166-ef17-4fc4-8514-760f610efe2f/merged.wav"}

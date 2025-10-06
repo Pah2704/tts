@@ -1,0 +1,29 @@
+{
+  "blockId": "8260afb3-4865-4544-85a8-d33b01f90e64",
+  "engine": "piper",
+  "voiceId": "en_US",
+  "createdAt": "2025-10-06T08:05:21Z",
+  "rows": [
+    {
+      "index": 0,
+      "rowId": "2f696255-637f-4d19-9c0e-20ab5fd31079",
+      "fileKey": "blocks/8260afb3-4865-4544-85a8-d33b01f90e64/rows/000_2f696255-637f-4d19-9c0e-20ab5fd31079.wav",
+      "bytes": 47148,
+      "durationMs": 1068
+    },
+    {
+      "index": 1,
+      "rowId": "58b23742-2fd7-43de-95de-e0bdac39f14e",
+      "fileKey": "blocks/8260afb3-4865-4544-85a8-d33b01f90e64/rows/001_58b23742-2fd7-43de-95de-e0bdac39f14e.wav",
+      "bytes": 138284,
+      "durationMs": 3134
+    },
+    {
+      "index": 2,
+      "rowId": "3c64ac85-386d-42f1-bea4-855b157613a9",
+      "fileKey": "blocks/8260afb3-4865-4544-85a8-d33b01f90e64/rows/002_3c64ac85-386d-42f1-bea4-855b157613a9.wav",
+      "bytes": 89644,
+      "durationMs": 2031
+    }
+  ]
+}

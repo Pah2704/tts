@@ -1,0 +1,29 @@
+{
+  "blockId": "inline-smoke",
+  "engine": "piper",
+  "voiceId": "en_US",
+  "createdAt": "2025-10-06T07:59:06Z",
+  "rows": [
+    {
+      "index": 0,
+      "rowId": "r1",
+      "fileKey": "blocks/inline-smoke/rows/000_r1.wav",
+      "bytes": 46124,
+      "durationMs": 1044
+    },
+    {
+      "index": 1,
+      "rowId": "r2",
+      "fileKey": "blocks/inline-smoke/rows/001_r2.wav",
+      "bytes": 138284,
+      "durationMs": 3134
+    },
+    {
+      "index": 2,
+      "rowId": "r3",
+      "fileKey": "blocks/inline-smoke/rows/002_r3.wav",
+      "bytes": 88620,
+      "durationMs": 2008
+    }
+  ]
+}

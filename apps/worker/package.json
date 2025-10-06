@@ -1,0 +1,18 @@
+{
+  "name": "tts-vtn-worker",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "bullmq": "^5.59.0",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3",
+    "@types/node": "^20.11.30"
+  }
+}

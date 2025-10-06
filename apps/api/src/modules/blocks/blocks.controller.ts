@@ -1,4 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Inject, NotFoundException, Param, Patch, Post } from '@nestjs/common';
+
+import {
+  STORAGE,
+  Storage,
+  StorageNotFoundError,
+} from '../../storage/storage';
 
 import { CreateBlockDto } from './dto/create-block.dto';
 import { UpdateBlockDto } from './dto/update-block.dto';
@@ -6,7 +12,10 @@ import { BlocksService } from './blocks.service';
 
 @Controller('blocks')
 export class BlocksController {
-  constructor(private readonly svc: BlocksService) {}
+  constructor(
+    private readonly svc: BlocksService,
+    @Inject(STORAGE) private readonly storage: Storage,
+  ) {}
 
   @Post()
   create(@Body() dto: CreateBlockDto) {
@@ -21,5 +30,15 @@ export class BlocksController {
   @Get(':id')
   get(@Param('id') id: string) {
     return this.svc.get(id);
+  }
+
+  @Get(':id/manifest')
+  getManifest(@Param('id') id: string) {
+    try {
+      return this.storage.readJson(`blocks/${id}/manifest.json`);
+    } catch (err) {
+      if (err instanceof StorageNotFoundError) throw new NotFoundException('Manifest not found');
+      throw err;
+    }
   }
 }
