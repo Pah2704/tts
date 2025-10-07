@@ -1,0 +1,87 @@
+{
+  "version": "1.1",
+  "blockId": "66bf6b48-376c-4823-8d31-6052a89bf3f7",
+  "engine": "piper",
+  "voiceId": "en_US-amy-medium",
+  "createdAt": "2025-10-06T09:26:53Z",
+  "rows": [
+    {
+      "index": 0,
+      "rowId": "6dee2b99-03f3-4d82-b8e3-b8ea20209b2f",
+      "fileKey": "blocks/66bf6b48-376c-4823-8d31-6052a89bf3f7/rows/000_6dee2b99-03f3-4d82-b8e3-b8ea20209b2f.wav",
+      "bytes": 35884,
+      "durationMs": 812,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -8.62,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -8.62,
+          "postTruePeakDb": -8.62,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 1,
+      "rowId": "630b8121-3748-462c-a983-abdc7a1162aa",
+      "fileKey": "blocks/66bf6b48-376c-4823-8d31-6052a89bf3f7/rows/001_630b8121-3748-462c-a983-abdc7a1162aa.wav",
+      "bytes": 26668,
+      "durationMs": 603,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -6.92,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -6.92,
+          "postTruePeakDb": -6.92,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 2,
+      "rowId": "e1794552-bef9-42ae-84b1-ee5c82912f60",
+      "fileKey": "blocks/66bf6b48-376c-4823-8d31-6052a89bf3f7/rows/002_e1794552-bef9-42ae-84b1-ee5c82912f60.wav",
+      "bytes": 136748,
+      "durationMs": 3099,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -4.95,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -4.95,
+          "postTruePeakDb": -4.95,
+          "postLufs": -16.0
+        }
+      }
+    }
+  ],
+  "merged": {
+    "fileKey": "blocks/66bf6b48-376c-4823-8d31-6052a89bf3f7/merged.wav",
+    "bytes": 238900,
+    "durationMs": 5416,
+    "metrics": {
+      "lufsIntegrated": -16.79,
+      "truePeakDb": -4.95,
+      "clippingPct": 0.0,
+      "score": 0.921,
+      "warnings": [
+        "lufs-near-edge: Δ0.79 LU"
+      ]
+    }
+  },
+  "qcSummary": {
+    "rowsPass": 3,
+    "rowsFail": 0,
+    "blockLufs": -16.0,
+    "blockTruePeakDb": -4.95,
+    "blockClippingPct": 0.0
+  }
+}

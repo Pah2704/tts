@@ -1,0 +1,29 @@
+{
+  "blockId": "f64d5dd9-68c6-4b49-bbc2-ada2de6603f0",
+  "engine": "piper",
+  "voiceId": "en_US",
+  "createdAt": "2025-10-06T08:44:23Z",
+  "rows": [
+    {
+      "index": 0,
+      "rowId": "dbb02e70-f77e-42f8-92e2-5ee76e2cdfb1",
+      "fileKey": "blocks/f64d5dd9-68c6-4b49-bbc2-ada2de6603f0/rows/000_dbb02e70-f77e-42f8-92e2-5ee76e2cdfb1.wav",
+      "bytes": 45612,
+      "durationMs": 1033
+    },
+    {
+      "index": 1,
+      "rowId": "2d409036-c740-4c39-84b8-2e41006bb0f5",
+      "fileKey": "blocks/f64d5dd9-68c6-4b49-bbc2-ada2de6603f0/rows/001_2d409036-c740-4c39-84b8-2e41006bb0f5.wav",
+      "bytes": 135212,
+      "durationMs": 3065
+    },
+    {
+      "index": 2,
+      "rowId": "f4eb7e98-1eb8-4b3c-aec7-7ceec4e83d1f",
+      "fileKey": "blocks/f64d5dd9-68c6-4b49-bbc2-ada2de6603f0/rows/002_f4eb7e98-1eb8-4b3c-aec7-7ceec4e83d1f.wav",
+      "bytes": 89644,
+      "durationMs": 2031
+    }
+  ]
+}

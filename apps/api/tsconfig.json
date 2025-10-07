@@ -8,8 +8,13 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "resolveJsonModule": true,
+    
     "types": [
-      "node"
+      "node", "jest"
     ]
-  }
+  },
+  "include": ["src", "test", "jest.config.ts"]
 }

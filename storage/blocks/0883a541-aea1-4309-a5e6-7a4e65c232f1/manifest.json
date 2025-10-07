@@ -1,0 +1,85 @@
+{
+  "blockId": "0883a541-aea1-4309-a5e6-7a4e65c232f1",
+  "engine": "piper",
+  "voiceId": "en_US",
+  "createdAt": "2025-10-06T08:38:30Z",
+  "rows": [
+    {
+      "index": 0,
+      "rowId": "709bd74a-3c2f-4d55-a1c3-8c66e150abc7",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/000_709bd74a-3c2f-4d55-a1c3-8c66e150abc7.wav",
+      "bytes": 199212,
+      "durationMs": 4516
+    },
+    {
+      "index": 1,
+      "rowId": "b492c9cc-a785-4420-a2d3-730b2f5936d0",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/001_b492c9cc-a785-4420-a2d3-730b2f5936d0.wav",
+      "bytes": 198188,
+      "durationMs": 4493
+    },
+    {
+      "index": 2,
+      "rowId": "568deae2-4fc1-4b1e-b165-9ac71e30bd68",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/002_568deae2-4fc1-4b1e-b165-9ac71e30bd68.wav",
+      "bytes": 210476,
+      "durationMs": 4771
+    },
+    {
+      "index": 3,
+      "rowId": "29b584ab-0fd1-46c4-8ded-0ba985eecc66",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/003_29b584ab-0fd1-46c4-8ded-0ba985eecc66.wav",
+      "bytes": 235052,
+      "durationMs": 5328
+    },
+    {
+      "index": 4,
+      "rowId": "a2bbae12-4166-4794-9f16-dd4532eabfc8",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/004_a2bbae12-4166-4794-9f16-dd4532eabfc8.wav",
+      "bytes": 250924,
+      "durationMs": 5688
+    },
+    {
+      "index": 5,
+      "rowId": "2296c916-7c52-4762-8366-93e26af045c9",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/005_2296c916-7c52-4762-8366-93e26af045c9.wav",
+      "bytes": 285740,
+      "durationMs": 6478
+    },
+    {
+      "index": 6,
+      "rowId": "3df6ee8a-7690-42e1-8fee-6f1ac484c7cb",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/006_3df6ee8a-7690-42e1-8fee-6f1ac484c7cb.wav",
+      "bytes": 270892,
+      "durationMs": 6141
+    },
+    {
+      "index": 7,
+      "rowId": "90a0e5ce-e009-46c1-8518-0b63b4fc1bc0",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/007_90a0e5ce-e009-46c1-8518-0b63b4fc1bc0.wav",
+      "bytes": 198700,
+      "durationMs": 4504
+    },
+    {
+      "index": 8,
+      "rowId": "e00fd0b6-859a-4d2c-ac52-20a96acfd2ae",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/008_e00fd0b6-859a-4d2c-ac52-20a96acfd2ae.wav",
+      "bytes": 185900,
+      "durationMs": 4214
+    },
+    {
+      "index": 9,
+      "rowId": "bcd16229-e83e-4b9b-ba13-e1a3690870fb",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/009_bcd16229-e83e-4b9b-ba13-e1a3690870fb.wav",
+      "bytes": 291884,
+      "durationMs": 6617
+    },
+    {
+      "index": 10,
+      "rowId": "8a22350b-8c9a-4660-83b0-d4cb343e2938",
+      "fileKey": "blocks/0883a541-aea1-4309-a5e6-7a4e65c232f1/rows/010_8a22350b-8c9a-4660-83b0-d4cb343e2938.wav",
+      "bytes": 309292,
+      "durationMs": 7012
+    }
+  ]
+}
