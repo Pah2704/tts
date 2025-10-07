@@ -1,0 +1,53 @@
+name: Smoke (Compose + SSE + QC)
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      checks: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Compose up (detached)
+        run: |
+          docker compose up -d --build
+          docker ps
+
+      - name: Run smoke Day-5 script
+        run: bash ops/dev/smoke_day5.sh
+
+      - name: Collect artifacts (SSE & audio)
+        if: always()
+        run: |
+          mkdir -p artifacts
+          find . -maxdepth 2 -name "sse_*.ndjson" -exec cp {} artifacts/ \; || true
+          find storage -name "row0.wav" -o -name "merged.wav" -exec cp --parents {} artifacts/ \; || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-artifacts
+          path: artifacts
+
+      - name: Compose down (clean)
+        if: always()
+        run: docker compose down -v

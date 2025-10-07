@@ -1,0 +1,40 @@
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["./storage/minio:/data"]
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >-
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${S3_ACCESS_KEY:-minioadmin} ${S3_SECRET_KEY:-minioadmin} &&
+      mc mb -p local/${S3_BUCKET:-tts-vtn} || true &&
+      mc anonymous set download local/${S3_BUCKET:-tts-vtn} || true &&
+      sleep 1
+      "
+
+  api:
+    environment:
+      STORAGE_KIND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: tts-vtn
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_FORCE_PATH_STYLE: "1"
+      S3_SECURE: "0"
+
+  worker:
+    environment:
+      STORAGE_KIND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: tts-vtn
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_FORCE_PATH_STYLE: "1"
+      S3_SECURE: "0"
