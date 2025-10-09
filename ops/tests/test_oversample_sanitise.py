@@ -1,4 +1,6 @@
-import importlib, os, sys, types, pytest
+import importlib
+import sys
+import pytest
 
 def _reload_settings():
     if "apps.worker.config" in sys.modules:
@@ -14,5 +16,12 @@ def test_oversample_ok(monkeypatch):
 
 def test_oversample_bad_fallback4(monkeypatch):
     monkeypatch.setenv("TRUEPEAK_OVERSAMPLE", "7")
+    s = _reload_settings()
+    assert s.TRUEPEAK_OVERSAMPLE == 4
+
+
+@pytest.mark.parametrize("bad", ["", "abc", "-4", "0", "-1", "not-a-number"])
+def test_oversample_sanitise_garbage(monkeypatch, bad):
+    monkeypatch.setenv("TRUEPEAK_OVERSAMPLE", str(bad))
     s = _reload_settings()
     assert s.TRUEPEAK_OVERSAMPLE == 4

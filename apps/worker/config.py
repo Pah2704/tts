@@ -47,9 +47,10 @@ settings.LUFS_TOL = settings.LUFS_TOLERANCE
 
 
 def log_effective_settings() -> None:
+    hq_str = "true" if settings.HQ_ENABLED else "false"
     logging.getLogger("worker").info(
         "settings: HQ=%s OVERSAMPLE=%dx TARGET_LUFS=%.2f±%.2f TRUEPEAK_MAX=%.2f dBTP",
-        settings.HQ_ENABLED,
+        hq_str,
         settings.TRUEPEAK_OVERSAMPLE,
         settings.TARGET_LUFS,
         settings.LUFS_TOLERANCE,

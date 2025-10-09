@@ -1,5 +1,7 @@
 # ops/tests/test_minio_smoke.py
-import json, os, time, urllib.request
+import json, os, time, urllib.error, urllib.request
+
+import pytest
 
 BASE = os.getenv("API_BASE", "http://localhost:4000")
 
@@ -14,6 +16,29 @@ def _post(path, payload):
 def _get_json(path):
     with urllib.request.urlopen(BASE + path, timeout=15) as r:
         return json.loads(r.read().decode())
+
+def test_manifest_not_ready_returns_json_error():
+    try:
+        block = _post("/blocks", {"text": "Manifest pending"})
+    except urllib.error.URLError as exc:
+        pytest.skip(f"API not reachable: {exc}")
+
+    try:
+        _get_json(f"/blocks/{block['id']}/manifest")
+    except urllib.error.HTTPError as err:
+        assert err.code == 404
+        payload = json.loads(err.read().decode() or "{}")
+        message = payload.get("message", {})
+        if isinstance(message, dict):
+            assert message.get("error") == "Manifest not ready"
+        else:
+            assert "manifest" in str(message).lower()
+        ctype = err.headers.get("Content-Type") or ""
+        assert ctype.lower().startswith("application/json")
+    except urllib.error.URLError as exc:
+        pytest.skip(f"API not reachable: {exc}")
+    else:
+        pytest.skip("Manifest unexpectedly ready during test run")
 
 def test_minio_smoke_end_to_end():
     # 1) tạo block + job

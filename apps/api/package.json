@@ -1,6 +1,6 @@
 {
   "name": "tts-vtn-api",
-  "version": "0.0.1",
+  "version": "v0.6.0-day7",
   "private": true,
   "scripts": {
     "start": "node dist/main.js",
@@ -25,8 +25,10 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
     "@types/jest": "^30.0.0",
+    "@types/supertest": "^6.0.3",
     "@types/node": "^20.14.2",
     "jest": "^30.2.0",
+    "supertest": "^7.0.0",
     "ts-jest": "^29.4.4",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
