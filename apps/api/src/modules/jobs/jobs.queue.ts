@@ -1,35 +1,46 @@
-import { Queue, Worker, Job } from 'bullmq';
+import { Job, Queue, Worker } from 'bullmq';
 import IORedis, { RedisOptions } from 'ioredis';
 import { TtsJobPayload } from './jobs.dto';
+import { connectionUrl, makeTtsQueue, prefix, TTS_QUEUE } from './queue.config';
 
-const redisUrl = process.env.REDIS_URL!;
 const redisOpts: RedisOptions = {
-  // BẮT BUỘC với BullMQ Worker (blocking):
   maxRetriesPerRequest: null,
-  // Nên tắt để tránh ready check treo trên một số môi trường/docker:
   enableReadyCheck: false,
 };
 
-const connection = new IORedis(redisUrl, redisOpts);
-const pub = new IORedis(redisUrl, redisOpts);
+const connectionOptions = {
+  url: connectionUrl,
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
+};
 
-const RAW_QUEUE_NAME = process.env.QUEUE_TTS_BLOCK || 'tts_block';
-export const ttsQueueName = RAW_QUEUE_NAME.replace(/[:\s]+/g, '_');
-export const ttsQueue = new Queue<TtsJobPayload>(ttsQueueName, { connection });
+const pub = new IORedis(connectionUrl, redisOpts);
+
+export const ttsQueueName = TTS_QUEUE;
+export const ttsQueue: Queue<TtsJobPayload> = makeTtsQueue();
+
+export const SNAPSHOT_TTL_SEC = Number(process.env.SNAPSHOT_TTL_SEC ?? 900);
 
 export async function enqueueTtsJob(payload: TtsJobPayload): Promise<{ jobId: string }> {
   const job = await ttsQueue.add('block', payload, {
-    attempts: 2,
-    backoff: { type: 'fixed', delay: 2000 },
-    removeOnComplete: true,
+    attempts: Number(process.env.QUEUE_ATTEMPTS ?? 2),
+    backoff: { type: 'fixed', delay: Number(process.env.QUEUE_BACKOFF_MS ?? 2000) },
   });
   return { jobId: String(job.id) };
+}
+
+export function getTtsJob(jobId: string) {
+  return ttsQueue.getJob(jobId);
+}
+
+export function waitForTtsQueue() {
+  return ttsQueue.waitUntilReady();
 }
 
 export function startTtsWorker() {
   const concurrency = Number(process.env.QUEUE_CONCURRENCY || 1);
 
-  new Worker<TtsJobPayload>(
+  return new Worker<TtsJobPayload>(
     ttsQueueName,
     async (job: Job<TtsJobPayload>) => {
       const rows = job.data.rows;
@@ -37,11 +48,16 @@ export function startTtsWorker() {
         throw new Error('rows missing or empty');
       }
       const total = rows.length;
-      const ch = `progress:${job.id}`;
+      const channel = `progress:${job.id}`;
 
       for (let i = 0; i < total; i++) {
-        await pub.publish(ch, JSON.stringify({ type: 'row', rowIndex: i, total, state: 'running' }));
-        await new Promise(r => setTimeout(r, 150 + Math.random() * 200));
+        await emit(channel, {
+          type: 'row',
+          rowIndex: i,
+          total,
+          state: 'running',
+        });
+        await new Promise((resolve) => setTimeout(resolve, 150 + Math.random() * 200));
         const fakeMetrics = {
           lufsIntegrated: -16 + (Math.random() - 0.5) * 0.5,
           truePeakDb: -1.4 + Math.random() * 0.4,
@@ -49,7 +65,7 @@ export function startTtsWorker() {
           score: 0.9,
           warnings: [] as string[],
         };
-        await pub.publish(ch, JSON.stringify({
+        await emit(channel, {
           type: 'row',
           rowIndex: i,
           total,
@@ -58,10 +74,10 @@ export function startTtsWorker() {
           bytes: 40960,
           durationMs: 950,
           metrics: fakeMetrics,
-        }));
+        });
       }
 
-      await pub.publish(ch, JSON.stringify({
+      await emit(channel, {
         type: 'final',
         state: 'done',
         manifestKey: `blocks/${job.data.blockId}/manifest.json`,
@@ -72,10 +88,21 @@ export function startTtsWorker() {
           blockTruePeakDb: -1.2,
           blockClippingPct: 0,
         },
-      }));
+      });
       return { ok: true };
     },
-    // Quan trọng: truyền connection có maxRetriesPerRequest:null
-    { connection, concurrency }
+    {
+      connection: connectionOptions,
+      prefix,
+      concurrency,
+    },
   );
 }
+
+async function emit(channel: string, payload: Record<string, unknown>) {
+  const serialized = JSON.stringify(payload);
+  await pub.publish(channel, serialized);
+  await pub.set(`${channel}:last`, serialized, 'EX', SNAPSHOT_TTL_SEC);
+}
+
+export { connectionOptions as workerConnectionOptions };

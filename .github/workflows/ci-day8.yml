@@ -1,115 +1,219 @@
 name: CI Day8
-
 on:
   push:
-    branches:
-      - main
-      - feat/**
+    branches: [ "main", "feat/**" ]
   pull_request:
   workflow_dispatch: {}
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping || exit 1"
-          --health-interval=3s
-          --health-retries=5
 
     env:
-      REDIS_URL: redis://localhost:6379
-      STORAGE_KIND: s3
-      S3_ENDPOINT: http://localhost:9000
-      S3_ACCESS_KEY: minio
-      S3_SECRET_KEY: minio123
-      S3_BUCKET: tts-vtn
-      API_PORT: 4000
-      VITE_API_BASE: http://localhost:4000
-      ENGINE_DEFAULT: piper
+      # Python import apps/*
+      PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/apps"
+      # App env
+      REDIS_URL: "redis://127.0.0.1:6379"
+      STORAGE_KIND: "s3"
+      S3_ENDPOINT: "http://127.0.0.1:9000"
+      S3_ACCESS_KEY: "minioadmin"
+      S3_SECRET_KEY: "minioadmin"
+      S3_BUCKET: "tts-vtn"
+      API_PORT: "4000"
+      VITE_API_BASE: "http://127.0.0.1:4000"
+      ENGINE_DEFAULT: "piper"
       HQ_TOGGLE: "true"
-      MINIO_IMAGE: quay.io/minio/minio:latest
+      MINIO_IMAGE: "quay.io/minio/minio:latest"
+      MINIO_NAME: "minio"
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node 20 + pnpm
+      - name: Start Redis (official) on safe port
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker run -d --rm --name "${GITHUB_JOB}-redis" -p 6379:6379 redis:7-alpine
+          for i in {1..60}; do
+            if docker exec "${GITHUB_JOB}-redis" redis-cli -p 6379 PING | grep -q PONG; then
+              echo "Redis ready"
+              break
+            fi
+            echo "waiting Redis ($i/60)"
+            sleep 1
+          done
+          if ! docker exec "${GITHUB_JOB}-redis" redis-cli -p 6379 PING | grep -q PONG; then
+            echo "❌ Redis not ready"
+            docker logs "${GITHUB_JOB}-redis" || true
+            exit 1
+          fi
+          docker exec "${GITHUB_JOB}-redis" redis-cli -p 6379 INFO server | sed -n '1,12p'
+
+      - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: pnpm
-      - name: Enable corepack + install pnpm
+
+      - name: Enable pnpm via corepack
         run: |
           corepack enable
           corepack prepare pnpm@latest --activate
-      - name: Install workspace dependencies
-        run: pnpm -w install --frozen-lockfile
+          pnpm -v
+
+      - name: Get pnpm store dir
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install worker dependencies
+
+      - name: Install Python deps
         run: |
           python -m pip install -U pip wheel
           pip install -r apps/worker/requirements.txt
+          pip install -r ops/tests/requirements.txt
 
-      - name: Start MinIO (official)
+      - name: Start MinIO (official) on safe ports
         run: |
+          docker rm -f "${MINIO_NAME}" 2>/dev/null || true
           docker pull "${MINIO_IMAGE}"
-          docker run -d --name minio \
+          docker run -d --rm --name "${MINIO_NAME}" \
             -p 9000:9000 -p 9001:9001 \
             -e MINIO_ROOT_USER="${S3_ACCESS_KEY}" \
             -e MINIO_ROOT_PASSWORD="${S3_SECRET_KEY}" \
             "${MINIO_IMAGE}" server /data --console-address ":9001"
-          for i in {1..30}; do
-            if curl -sf http://localhost:9000/minio/health/live >/dev/null; then
-              echo "MinIO is live"
-              break
+          for i in $(seq 1 40); do
+            if curl -sf "http://127.0.0.1:9000/minio/health/live" >/dev/null; then
+              echo "MinIO is live"; break
             fi
-            echo "…waiting MinIO ($i/30)"
-            sleep 2
+            echo "waiting MinIO ($i/40)"; sleep 2
           done
 
       - name: Create bucket (idempotent)
         run: |
-          pip install minio
           python - <<'PY'
           from minio import Minio
           import os, time
-
-          client = Minio(
-              "localhost:9000",
-              access_key=os.getenv("S3_ACCESS_KEY"),
-              secret_key=os.getenv("S3_SECRET_KEY"),
-              secure=False,
-          )
-          bucket = os.getenv("S3_BUCKET", "tts-vtn")
+          c=Minio("127.0.0.1:9000", os.getenv("S3_ACCESS_KEY"), os.getenv("S3_SECRET_KEY"), secure=False)
+          b=os.getenv("S3_BUCKET","tts-vtn")
           for _ in range(30):
-              try:
-                  if not client.bucket_exists(bucket):
-                      client.make_bucket(bucket)
-                  print("Bucket ready:", bucket)
-                  break
-              except Exception:
-                  time.sleep(1)
+            try:
+              if not c.bucket_exists(b): c.make_bucket(b)
+              print("Bucket ready:", b)
+              break
+            except Exception:
+              time.sleep(1)
           PY
-
-      - name: PyTest (ops/tests)
-        run: pytest -q ops/tests
 
       - name: Build API
         working-directory: apps/api
         run: pnpm build
+
+      - name: API + PyTest (same step)
+        shell: bash
+        env:
+          API_PORT: 4000
+          API_BASE: http://127.0.0.1:4000
+          NODE_ENV: test
+          TZ: UTC
+          TTS_INLINE_WORKER: "1"
+          REDIS_URL: redis://127.0.0.1:6379
+          BULLMQ_CONNECTION: redis://127.0.0.1:6379
+          BULL_REDIS_URL: redis://127.0.0.1:6379
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          AWS_ACCESS_KEY_ID: minioadmin
+          AWS_SECRET_ACCESS_KEY: minioadmin
+          S3_BUCKET: tts-vtn
+          S3_REGION: us-east-1
+          S3_ENDPOINT: http://127.0.0.1:9000
+          S3_FORCE_PATH_STYLE: "true"
+          MINIO_ENDPOINT: http://127.0.0.1:9000
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+          BULLMQ_PREFIX: bull
+          BULL_PREFIX: bull
+          QUEUE_NAME: tts
+          TTS_QUEUE: tts
+          JOBS_QUEUE: tts
+          BULL_QUEUE: tts
+          BULLMQ_QUEUE: tts
+          BULLMQ_REMOVE_ON_COMPLETE_AGE: "60"
+          DEBUG: "bull:*"
+        run: |
+          set -Eeuo pipefail
+
+          # --- Start API in background ---
+          pushd apps/api >/dev/null
+          ENTRY=""
+          [[ -f dist/main.js ]] && ENTRY="dist/main.js"
+          [[ -z "$ENTRY" && -f dist/src/main.js ]] && ENTRY="dist/src/main.js"
+          if [[ -z "$ENTRY" ]]; then
+            echo "❌ No dist entry"; ls -R dist || true; exit 1
+          fi
+
+          nohup node "$ENTRY" >"$GITHUB_WORKSPACE/api.log" 2>&1 < /dev/null &
+          API_PID=$!
+          popd >/dev/null
+
+          # --- Wait for API up (IPv4) ---
+          for i in {1..60}; do
+            if curl -sf "http://127.0.0.1:${API_PORT}/health" >/dev/null || \
+               curl -sf "http://127.0.0.1:${API_PORT}/" >/dev/null; then
+              echo "API is up on :${API_PORT}"
+              break
+            fi
+            echo "waiting API ($i/60)"; sleep 1
+          done
+
+          curl -sSf "${API_BASE}/hello" || true
+          echo "--- Redis keys (bull*) ---"
+          docker exec "${GITHUB_JOB}-redis" redis-cli --scan --pattern "bull:*" | sort | head -n 40 || true
+          echo "--- Redis keys (*:tts:*) ---"
+          docker exec "${GITHUB_JOB}-redis" redis-cli --scan --pattern "*:tts:*" | sort | head -n 40 || true
+          echo "--- Redis keys (*:wait) ---"
+          docker exec "${GITHUB_JOB}-redis" redis-cli --scan --pattern "*:wait" | sort | head -n 40 || true
+          echo "--- Redis keys (*:meta) ---"
+          docker exec "${GITHUB_JOB}-redis" redis-cli --scan --pattern "*:meta" | sort | head -n 40 || true
+          echo "--- Redis queue cardinalities ---"
+          docker exec "${GITHUB_JOB}-redis" redis-cli llen bull:tts_block:wait || true
+          docker exec "${GITHUB_JOB}-redis" redis-cli zcard bull:tts_block:delayed || true
+          docker exec "${GITHUB_JOB}-redis" redis-cli scard bull:tts_block:active || true
+          docker exec "${GITHUB_JOB}-redis" redis-cli scard bull:tts_block:completed || true
+
+          # --- Run tests ---
+          set +e
+          python -m pytest -q ops/tests
+          TEST_RC=$?
+          set -e
+
+          echo "---- API LOG (tail) ----"
+          tail -n 200 "$GITHUB_WORKSPACE/api.log" || true
+
+          kill "$API_PID" 2>/dev/null || true
+          exit ${TEST_RC}
 
       - name: Build Frontend
         working-directory: apps/frontend
         run: pnpm build
 
       - if: always()
+        name: Stop Redis
+        shell: bash
+        run: docker stop "${GITHUB_JOB}-redis" || true
+
+      - if: always()
         name: Stop MinIO
-        run: docker stop minio || true
+        run: docker stop "${MINIO_NAME}" || true

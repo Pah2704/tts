@@ -124,13 +124,42 @@ export class JobsController {
 
   @Get(':id/status')
   async status(@Param('id') id: string) {
-    const channel = `progress:${id}`;
-    const snap = await this.kv.get(`${channel}:last`);
-    if (!snap) throw new NotFoundException({ jobId: id, state: 'unknown' });
+    let snapshot: any = null;
     try {
-      return JSON.parse(snap);
-    } catch {
-      throw new NotFoundException({ jobId: id, state: 'invalid' });
+      const ch = `progress:${id}`;
+      const cached = await this.kv.get(`${ch}:last`);
+      if (cached) {
+        snapshot = JSON.parse(cached);
+      }
+    } catch {}
+
+    const job = await this.svc.get(id);
+    if (!job) {
+      return {
+        id,
+        state: snapshot?.state ?? 'waiting',
+        found: false,
+        snapshot: snapshot ?? null,
+      };
     }
+
+    let state = snapshot?.state as string | undefined;
+    if (!state) {
+      try {
+        const jobState = await job.getState();
+        state = jobState === 'completed' ? 'done'
+          : jobState === 'failed' ? 'error'
+          : jobState ?? 'unknown';
+      } catch {
+        state = 'unknown';
+      }
+    }
+
+    return {
+      id: job.id,
+      state: state ?? 'unknown',
+      found: true,
+      snapshot: snapshot ?? null,
+    };
   }
 }
