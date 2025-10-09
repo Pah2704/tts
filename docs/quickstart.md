@@ -1,51 +1,26 @@
-### 1.3 `docs/quickstart.md` (new)
-```md
-# Quickstart — Dev on WSL2 + Docker Compose
+# Quickstart — TTS-VTN Day 8
 
-## Prereqs
-Docker (WSL2), Node 20 + pnpm, Python 3.11, ffmpeg/sox.
+This quick start assumes Docker + docker compose, `jq`, and curl are available. The API listens on `http://localhost:4000`, the frontend on `http://localhost:3000`, and artifacts are persisted to the S3-compatible key scheme defined in ADR-0017 (`mix/block-{blockId}.wav`, `qc/block-{blockId}.json`, etc.).
 
-## Up the stack
-```bash
-cp .env.example .env
-docker compose up -d --build
-```
+Run the following three commands from the project root:
 
-## Run a job (outline)
-- POST `/blocks` → POST `/blocks/:id/job`
-- Subscribe SSE: `GET /jobs/:jobId/stream` (closes on `final`)
-- Download: `/files/blocks/{blockId}/rows/{i}.wav`, `/files/blocks/{blockId}/merged.wav`
-```
+1. **Bring the stack online**
+   ```bash
+   docker compose up -d --build
+   ```
 
-1) Prereqs: Docker (WSL2), Node 20 + pnpm, Python 3.11, ffmpeg/sox.
-2) Clone & prepare:
-```bash
-cp .env.example .env     # fill as needed
-docker compose up -d --build
-```
-3) Create a Block & Job:
-# POST /blocks
-# POST /blocks/:id/job  (engine piper by default)
-# Subscribe: GET /jobs/:jobId/stream   (SSE)
+2. **Create a block and enqueue a job (single line)**
+   ```bash
+   BLOCK_ID=$(curl -s http://localhost:4000/blocks -H "Content-Type: application/json" \
+     -d '{"projectId":"demo","kind":"mono","text":"Hello world. This is a quick start demo."}' | jq -r '.id') \
+   && JOB_ID=$(curl -s -X POST http://localhost:4000/blocks/$BLOCK_ID/job -H "Content-Type: application/json" -d '{}' | jq -r '.jobId') \
+   && echo "Block=$BLOCK_ID Job=$JOB_ID"
+   ```
 
-Watch progress per-row (SSE); when final arrives, stream will close.
-Download files:
-rows/[row].wav, mix/block-*.wav via GET /files/:key.
+3. **Poll the manifest, fetch `merged.wav` once ready**
+   ```bash
+   bash -lc 'for i in {1..60}; do K=$(curl -fsS http://localhost:4000/blocks/'"$BLOCK_ID"'/manifest | jq -r ".mixKey//empty"); \
+     if [ -n "$K" ]; then curl -fsS -o merged.wav "http://localhost:4000/files/$K" && echo "✓ saved merged.wav" && break; fi; sleep 2; done'
+   ```
 
-Optional: MinIO (S3)
-STORAGE_KIND=s3
-S3_ENDPOINT=http://localhost:9000
-S3_BUCKET=tts-vtn
-S3_ACCESS_KEY=minioadmin
-S3_SECRET_KEY=minioadmin
-S3_FORCE_PATH_STYLE=1
-S3_SECURE=0
-
-Bring MinIO up (see compose snippet in repo), then re-run smoke.
-
-### 1.4 `docs/releases/RELEASE_NOTES_v0.5.0-day5.md` (new, minimal)
-```md
-# v0.5.0-day5 — Snapshot
-- QC mandatory (row + block), Tail-merge (env-controlled), Manifest v1.1.
-- SSE v2.1: subscribe-then-replay; auto-close on `final`.
-- Smoke: `ops/dev/smoke_day5.sh` PASS (local FS).
+Behind the scenes the UI and tooling follow the ADR-0003 contract: REST endpoints for block/job orchestration, SSE at `GET /jobs/:jobId/stream` to monitor progress, and direct downloads via `/files/<key>` for finalized audio and QC artifacts.
