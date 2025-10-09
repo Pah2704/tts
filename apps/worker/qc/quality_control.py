@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-from qc.loudness import estimate_lufs
+from .loudness import estimate_lufs
 
 
 @dataclass

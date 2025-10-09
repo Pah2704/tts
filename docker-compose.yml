@@ -20,6 +20,14 @@ services:
       - QUEUE_CONCURRENCY=${QUEUE_CONCURRENCY}
       - API_INLINE_WORKER=0               # không chạy worker trong API
       - TZ=${TZ}
+      - PYTHONUNBUFFERED=1
+      - STORAGE_KIND=${STORAGE_KIND}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE}
+      - S3_REGION=${S3_REGION}
 
     volumes: [ "./storage:/data/storage" ]
     depends_on:
@@ -36,7 +44,9 @@ services:
     ports: ["${FRONTEND_PORT}:3000"]
 
   worker:
-    build: ./apps/worker                   # <— Node worker
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
     env_file: [.env]
     environment:
       - REDIS_URL=${REDIS_URL}
@@ -47,7 +57,17 @@ services:
       - QUEUE_TTS_BLOCK=${QUEUE_TTS_BLOCK}
       - QUEUE_CONCURRENCY=${QUEUE_CONCURRENCY}
       - TZ=${TZ}
-      - PYTHONPATH=/app/apps/worker
+      - STORAGE_KIND=${STORAGE_KIND}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE}
+      - S3_REGION=${S3_REGION}
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - PATH=/opt/py/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - LD_LIBRARY_PATH=/usr/local/lib/piper
     volumes:
       - ./storage:/data/storage
       - ./models:/models
@@ -55,4 +75,22 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    command: ["node", "/app/apps/worker/dist/index.js"]
     # không cần expose cổng vì không phục vụ HTTP
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports: ["9000:9000","9001:9001"]
+    volumes: [ "./storage/minio:/data" ]
+    secrets:
+      - access_key
+      - secret_key
+    environment:
+      MINIO_ROOT_USER_FILE: /run/secrets/access_key
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/secret_key
+
+secrets:
+  access_key:
+    file: ./ops/secrets/minio/access_key
+  secret_key:
+    file: ./ops/secrets/minio/secret_key

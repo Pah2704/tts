@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { FilesController } from './files.controller';
-import { createFsStorageProvider } from '../../storage/storage';
+import { createStorageProvider } from '../../storage/storage';
 
 @Module({
   controllers: [FilesController],
-  providers: [createFsStorageProvider()],
+  providers: [createStorageProvider()],
 })
 export class FilesModule {}

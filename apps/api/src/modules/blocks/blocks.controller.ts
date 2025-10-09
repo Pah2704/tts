@@ -33,11 +33,20 @@ export class BlocksController {
   }
 
   @Get(':id/manifest')
-  getManifest(@Param('id') id: string) {
+  async getManifest(@Param('id') id: string) {
+    const manifestKey = `blocks/${id}/manifest.json`;
+    const notReady = () => new NotFoundException({ error: 'Manifest not ready' });
+
     try {
-      return this.storage.readJson(`blocks/${id}/manifest.json`);
+      const manifest = await this.storage.readJson<Record<string, unknown>>(manifestKey);
+      if (manifest == null || typeof manifest !== 'object') {
+        throw notReady();
+      }
+      return manifest;
     } catch (err) {
-      if (err instanceof StorageNotFoundError) throw new NotFoundException('Manifest not found');
+      if (err instanceof NotFoundException) throw err;
+      if (err instanceof StorageNotFoundError) throw notReady();
+      if (err instanceof SyntaxError) throw notReady();
       throw err;
     }
   }

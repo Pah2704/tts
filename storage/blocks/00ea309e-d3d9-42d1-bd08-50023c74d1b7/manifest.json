@@ -1,0 +1,218 @@
+{
+  "version": "1.1",
+  "blockId": "00ea309e-d3d9-42d1-bd08-50023c74d1b7",
+  "engine": "piper",
+  "voiceId": "en_US-amy-medium",
+  "createdAt": "2025-10-07T01:45:26Z",
+  "rows": [
+    {
+      "index": 0,
+      "rowId": "4d9b40e8-bac9-4e91-981e-7ba6f5c57c59",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/000_4d9b40e8-bac9-4e91-981e-7ba6f5c57c59.wav",
+      "bytes": 100908,
+      "durationMs": 2287,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -7.79,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -7.79,
+          "postTruePeakDb": -7.79,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 1,
+      "rowId": "a09e0d0f-59ac-454a-874c-f0dcffe0e8dc",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/001_a09e0d0f-59ac-454a-874c-f0dcffe0e8dc.wav",
+      "bytes": 100396,
+      "durationMs": 2275,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -7.59,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -7.59,
+          "postTruePeakDb": -7.59,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 2,
+      "rowId": "428fe684-f36a-4b81-9c18-e6c16fa18cbe",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/002_428fe684-f36a-4b81-9c18-e6c16fa18cbe.wav",
+      "bytes": 90156,
+      "durationMs": 2043,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -8.38,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -8.38,
+          "postTruePeakDb": -8.38,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 3,
+      "rowId": "3095f44c-0625-4a83-a72b-35a2ae518579",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/003_3095f44c-0625-4a83-a72b-35a2ae518579.wav",
+      "bytes": 112684,
+      "durationMs": 2554,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -6.71,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -6.71,
+          "postTruePeakDb": -6.71,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 4,
+      "rowId": "0c6a9b72-116d-4e9a-b85e-9c37d0099655",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/004_0c6a9b72-116d-4e9a-b85e-9c37d0099655.wav",
+      "bytes": 96812,
+      "durationMs": 2194,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -7.45,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -7.45,
+          "postTruePeakDb": -7.45,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 5,
+      "rowId": "f03751f6-9435-4b54-86d1-de618f6ddc37",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/005_f03751f6-9435-4b54-86d1-de618f6ddc37.wav",
+      "bytes": 189996,
+      "durationMs": 4307,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -5.63,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -5.62,
+          "postTruePeakDb": -5.63,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 6,
+      "rowId": "fb8bbe39-dbc4-433b-8067-159b5980b1d1",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/006_fb8bbe39-dbc4-433b-8067-159b5980b1d1.wav",
+      "bytes": 193068,
+      "durationMs": 4376,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -7.44,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -7.44,
+          "postTruePeakDb": -7.44,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 7,
+      "rowId": "5c34746d-261d-47b5-abed-c1c9f2d13809",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/007_5c34746d-261d-47b5-abed-c1c9f2d13809.wav",
+      "bytes": 300076,
+      "durationMs": 6803,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -3.17,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -3.17,
+          "postTruePeakDb": -3.17,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 8,
+      "rowId": "187c57f3-3cad-4ebe-9209-2c3b3ff386eb",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/008_187c57f3-3cad-4ebe-9209-2c3b3ff386eb.wav",
+      "bytes": 218156,
+      "durationMs": 4945,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -4.16,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -4.16,
+          "postTruePeakDb": -4.16,
+          "postLufs": -16.0
+        }
+      }
+    },
+    {
+      "index": 9,
+      "rowId": "544621e5-4f72-44a4-8515-808677ea8e81",
+      "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/rows/009_544621e5-4f72-44a4-8515-808677ea8e81.wav",
+      "bytes": 228908,
+      "durationMs": 5189,
+      "metrics": {
+        "lufsIntegrated": -16.0,
+        "truePeakDb": -6.49,
+        "clippingPct": 0.0,
+        "score": 1.0,
+        "warnings": [],
+        "normalizer": {
+          "appliedGainDb": -6.48,
+          "postTruePeakDb": -6.48,
+          "postLufs": -16.0
+        }
+      }
+    }
+  ],
+  "merged": {
+    "fileKey": "blocks/00ea309e-d3d9-42d1-bd08-50023c74d1b7/merged.wav",
+    "bytes": 1809360,
+    "durationMs": 41027,
+    "metrics": {
+      "lufsIntegrated": -16.46,
+      "truePeakDb": -3.17,
+      "clippingPct": 0.0,
+      "score": 0.954,
+      "warnings": []
+    }
+  },
+  "qcSummary": {
+    "rowsPass": 10,
+    "rowsFail": 0,
+    "blockLufs": -16.0,
+    "blockTruePeakDb": -3.17,
+    "blockClippingPct": 0.0
+  }
+}

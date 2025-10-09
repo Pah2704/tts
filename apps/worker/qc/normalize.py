@@ -6,7 +6,7 @@ from typing import Dict
 
 import numpy as np
 
-from qc.loudness import estimate_lufs
+from .loudness import estimate_lufs
 
 
 def _read_wav_mono(path: str):

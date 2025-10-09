@@ -1,42 +1,16 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import { FsStorage } from './fs.storage';
+import { S3Storage } from './s3.storage';
+import { STORAGE, Storage, StorageNotFoundError, StorageObject } from './storage.types';
 
-export interface Storage {
-  stream(fileKey: string): NodeJS.ReadableStream;
-  readJson<T = unknown>(fileKey: string): T;
-}
+const kind = (process.env.STORAGE_KIND || 'fs').toLowerCase();
 
-export class StorageNotFoundError extends Error {
-  constructor(resource: string) {
-    super(`Storage resource not found: ${resource}`);
-    this.name = 'StorageNotFoundError';
-  }
-}
+export const storage: Storage = kind === 's3'
+  ? new S3Storage()
+  : new FsStorage({ root: process.env.STORAGE_ROOT || '/data/storage' });
 
-export class FsStorage implements Storage {
-  constructor(private readonly root = process.env.STORAGE_ROOT || '/data/storage') {}
+export { STORAGE, Storage, StorageNotFoundError, StorageObject };
 
-  private resolve(fileKey: string) {
-    return path.join(this.root, fileKey);
-  }
-
-  stream(fileKey: string) {
-    const full = this.resolve(fileKey);
-    if (!fs.existsSync(full)) throw new StorageNotFoundError(fileKey);
-    return fs.createReadStream(full);
-  }
-
-  readJson<T = unknown>(fileKey: string): T {
-    const full = this.resolve(fileKey);
-    if (!fs.existsSync(full)) throw new StorageNotFoundError(fileKey);
-    const raw = fs.readFileSync(full, 'utf-8');
-    return JSON.parse(raw) as T;
-  }
-}
-
-export const STORAGE = Symbol('STORAGE');
-
-export const createFsStorageProvider = () => ({
+export const createStorageProvider = () => ({
   provide: STORAGE,
-  useClass: FsStorage,
+  useValue: storage,
 });

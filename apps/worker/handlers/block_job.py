@@ -3,23 +3,21 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+import shutil
+from typing import Any, Dict, List, Optional, Tuple
 
 from redis import Redis
 
 from adapters.piper_adapter import synthesize_piper
-from mix.manifest import (
-    add_row,
-    init_manifest,
-    save_manifest,
-    set_merged,
-    set_qc_summary,
-)
-from mix.merge import tail_merge
-from qc import analyze_wav, evaluate
-from qc.normalize import normalize_lufs_inplace
-from qc.quality_control import Thresholds, thresholds_from_env
+from apps.worker.config import settings
+from apps.worker.mix.manifest import init_manifest
+from apps.worker.mix.merge import tail_merge
+from apps.worker.qc.aggregate import compute_qc_block, within_threshold
+from apps.worker.qc.normalize import normalize_lufs_inplace
+from apps.worker.qc.quality_control import Thresholds, analyze_wav, evaluate, thresholds_from_env
+from apps.worker.storage import put_object_bytes, put_object_json
 
+logger = logging.getLogger(__name__)
 
 SNAPSHOT_TTL_SEC = int(os.getenv("SNAPSHOT_TTL_SEC", "900"))
 QC_ENABLED = os.getenv("QC_ENABLE", "0").lower() not in {"0", "false", "off"}
@@ -27,183 +25,188 @@ MERGE_ENABLED = os.getenv("TTS_TAIL_MERGE", "0").lower() not in {"0", "false", "
 MERGE_GAP_MS = int(os.getenv("TTS_GAP_MS", "0"))
 MERGE_FADE_MS = int(os.getenv("TTS_FADE_MS", "0"))
 THRESHOLDS: Thresholds = thresholds_from_env()
-logger = logging.getLogger(__name__)
+
+OVERRIDE_MSG_EXACT = "QC overridden in DEV mode"
+OVERRIDE_MSG_SUB = "QC override in DEV mode"
+HQ_DISABLED_MSG = "HQ disabled"
 
 
 def process_block_job(job: dict):
     block_id = job.get("blockId")
     rows = job.get("rows")
-    if block_id is None:
+    if not block_id:
         raise KeyError("blockId")
     if not isinstance(rows, list) or not rows:
         raise KeyError("rows")
 
-    engine = job.get("engine", "piper")
-    voice_id = os.getenv("PIPER_VOICE_ID", "en_US")
     root = os.getenv("STORAGE_ROOT", "/data/storage")
-    job_id = job["jobId"]
-    total = len(rows)
+    job_id = job.get("jobId") or ''
 
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     rpub = Redis.from_url(redis_url)
-    channel = f"progress:{job_id}"
+    channel = f"progress:{job_id}" if job_id else None
 
-    manifest = init_manifest(block_id, engine, voice_id)
+    manifest = init_manifest(block_id)
+    manifest_rows = manifest.setdefault("rows", [])
+
     row_results: List[Dict[str, Any]] = []
+    mix_key = f"blocks/{block_id}/merged.wav"
+    mix_path = os.path.join(root, mix_key)
+    current_index: Optional[int] = None
 
-    current_index = None
     try:
-        for i, row in enumerate(rows):
-            current_index = i
-            emit(rpub, channel, {"type": "row", "state": "running", "rowIndex": i, "total": total})
+        for idx, row in enumerate(rows):
+            current_index = idx
+            if channel:
+                emit(rpub, channel, {"type": "row", "state": "running", "rowIndex": idx, "total": len(rows)})
 
-            rel_key = f"blocks/{block_id}/rows/{i:03d}_{row['rowId']}.wav"
-            out_wav = os.path.join(root, rel_key)
-            meta = synthesize_piper(row["text"], out_wav)
+            rel_key = f"blocks/{block_id}/rows/{idx:03d}_{row['rowId']}.wav"
+            audio_path = os.path.join(root, rel_key)
+            meta = synthesize_piper(row.get("text", ""), audio_path)
+
+            manifest_rows.append({"rowId": row["rowId"], "text": row.get("text", "")})
 
             if os.getenv("QC_AUTONORMALIZE", "0") == "1":
-                norm = normalize_lufs_inplace(
-                    out_wav,
-                    lufs_target=float(os.getenv("QC_NORM_LUFS_TARGET", "-16")),
-                    tp_max_db=float(os.getenv("QC_NORM_TRUEPEAK_DB_MAX", "-1.0")),
-                    safety_db=float(os.getenv("QC_TRUEPEAK_SAFETY_DB", "0.3")),
-                )
-            else:
-                norm = None
-            if norm:
-                logger.info("[qc][job %s row %s] norm=%s", job_id, i, norm)
+                try:
+                    normalize_lufs_inplace(
+                        audio_path,
+                        lufs_target=float(os.getenv("QC_NORM_LUFS_TARGET", "-16")),
+                        tp_max_db=float(os.getenv("QC_NORM_TRUEPEAK_DB_MAX", "-1.0")),
+                        safety_db=float(os.getenv("QC_TRUEPEAK_SAFETY_DB", "0.3")),
+                    )
+                except Exception:  # pragma: no cover
+                    logger.exception("[qc][job %s row %s] normalization failed", job_id, idx)
 
-            raw_metrics = analyze_wav(out_wav)
-            passed, warnings, score = evaluate(raw_metrics, THRESHOLDS)
-            metrics_payload = _format_metrics(raw_metrics, warnings, score)
-            if norm:
-                metrics_payload.setdefault("warnings", [])
-                if norm.get("warnings"):
-                    metrics_payload["warnings"].extend(norm["warnings"])
-                metrics_payload.setdefault("normalizer", {})["appliedGainDb"] = round(norm.get("appliedGainDb", 0.0), 2)
-                metrics_payload["normalizer"]["postTruePeakDb"] = round(norm.get("postTruePeakDb", 0.0), 2)
-                metrics_payload["normalizer"]["postLufs"] = round(norm.get("postLufs", 0.0), 2)
-            logger.info("[qc][job %s row %s] metrics=%s", job_id, i, metrics_payload)
-            result = {
-                "index": i,
+            with open(audio_path, "rb") as fh:
+                put_object_bytes(rel_key, fh.read(), "audio/wav")
+
+            metrics_raw = analyze_wav(audio_path)
+            passed, warnings, score = evaluate(metrics_raw, THRESHOLDS)
+            row_results.append({
+                "index": idx,
                 "rowId": row["rowId"],
                 "fileKey": rel_key,
                 "bytes": meta["bytes"],
                 "durationMs": meta["durationMs"],
-                "metrics": {**raw_metrics, "warnings": warnings, "score": score},
+                "metrics": {**metrics_raw, "warnings": warnings, "score": score},
                 "passed": passed,
-            }
-            row_results.append(result)
+            })
 
-            add_row(
-                manifest,
-                i,
-                row["rowId"],
-                rel_key,
-                meta["bytes"],
-                meta["durationMs"],
-                metrics_payload,
-            )
-
-            emit(
-                rpub,
-                channel,
-                {
+            if channel:
+                emit(rpub, channel, {
                     "type": "row",
                     "state": "done",
-                    "rowIndex": i,
-                    "total": total,
+                    "rowIndex": idx,
+                    "total": len(rows),
                     "fileKey": rel_key,
                     "bytes": meta["bytes"],
                     "durationMs": meta["durationMs"],
-                    "metrics": metrics_payload,
-                },
-            )
-
-            if QC_ENABLED and not passed:
-                error_msg = _format_qc_error(warnings, score)
-                emit(
-                    rpub,
-                    channel,
-                    {
-                        "type": "final",
-                        "state": "error",
-                        "error": error_msg,
-                        "atRow": i,
+                    "metrics": {
+                        "lufsIntegrated": metrics_raw.get("lufsIntegrated"),
+                        "truePeakDb": metrics_raw.get("truePeakDb"),
+                        "clippingPct": metrics_raw.get("clippingPct"),
+                        "score": score,
+                        "warnings": warnings,
                     },
-                )
-                raise RuntimeError(error_msg)
+                })
 
-        merged_info = None
-        merged_key = None
-        if MERGE_ENABLED:
-            wav_paths = [os.path.join(root, row['fileKey']) for row in row_results]
-            merged_rel = f"blocks/{block_id}/merged.wav"
-            merged_path = os.path.join(root, merged_rel)
-            merge_stats = tail_merge(wav_paths, MERGE_GAP_MS, MERGE_FADE_MS, merged_path)
-            merged_metrics = analyze_wav(merged_path)
-            merged_passed, merged_warnings, merged_score = evaluate(merged_metrics, THRESHOLDS)
-            merged_metrics.update({
-                "warnings": merged_warnings,
-                "score": round(merged_score, 3),
-            })
-            merged_info = {
-                "fileKey": merged_rel,
-                "bytes": merge_stats["bytes"],
-                "durationMs": merge_stats["durationMs"],
-                "metrics": merged_metrics,
+        merged_path: Optional[str]
+        if row_results:
+            first_path = os.path.join(root, row_results[0]["fileKey"])
+            os.makedirs(os.path.dirname(mix_path), exist_ok=True)
+            shutil.copyfile(first_path, mix_path)
+            merged_path = mix_path
+            if MERGE_ENABLED and len(row_results) > 1:
+                tail_merge(
+                    [os.path.join(root, row["fileKey"]) for row in row_results],
+                    MERGE_GAP_MS,
+                    MERGE_FADE_MS,
+                    mix_path,
+                )
+        else:
+            merged_path = None
+
+        if merged_path:
+            with open(merged_path, "rb") as fh:
+                put_object_bytes(mix_key, fh.read(), "audio/wav")
+        else:
+            mix_key = None
+
+        qc_key = f"qc/block-{block_id}.json"
+        if merged_path and settings.HQ_ENABLED:
+            qc = compute_qc_block(
+                mix_path=merged_path,
+                oversample_factor=settings.TRUEPEAK_OVERSAMPLE,
+                target_lufs=settings.TARGET_LUFS,
+                lufs_tol=settings.LUFS_TOL,
+                truepeak_max_db=settings.TRUEPEAK_MAX_DBTP,
+            )
+        else:
+            warnings = []
+            if not settings.HQ_ENABLED:
+                warnings.append(HQ_DISABLED_MSG)
+            if not merged_path:
+                warnings.append("Mix unavailable")
+            qc = {
+                "lufsIntegrated": None,
+                "truePeakDbtp": None,
+                "clippingCount": 0,
+                "oversampleFactor": settings.TRUEPEAK_OVERSAMPLE,
+                "penalties": {"penLUFS": 0.0, "penTP": 0.0, "penClip": 0.0},
+                "score": 0.0,
+                "warnings": warnings,
+                "pass": False,
             }
-            if QC_ENABLED and not merged_passed:
-                error_msg = _format_qc_error(merged_warnings, merged_score, prefix="merged")
-                emit(
-                    rpub,
-                    channel,
-                    {
-                        "type": "final",
-                        "state": "error",
-                        "error": error_msg,
-                    },
-                )
-                raise RuntimeError(error_msg)
-            set_merged(
-                manifest,
-                merged_rel,
-                merge_stats["bytes"],
-                merge_stats["durationMs"],
-                _format_metrics(merged_metrics, merged_warnings, merged_score),
-            )
 
-        qc_summary = _build_summary(row_results)
-        set_qc_summary(
-            manifest,
-            qc_summary["rowsPass"],
-            qc_summary["rowsFail"],
-            qc_summary.get("blockLufs"),
-            qc_summary.get("blockTruePeakDb"),
-            qc_summary.get("blockClippingPct"),
-        )
+        summary = _build_summary(row_results)
+        rows_ok = summary["rowsPass"]
+        rows_fail = summary["rowsFail"]
+        status, reason = _finalize_status(qc, rows_fail)
+        put_object_json(qc_key, qc)
 
-        save_manifest(manifest, root)
+        if mix_key:
+            manifest["mixKey"] = mix_key
+        else:
+            manifest.pop("mixKey", None)
 
-        final_payload: Dict[str, Any] = {
-            "type": "final",
-            "state": "done",
-            "manifestKey": f"blocks/{block_id}/manifest.json",
-            "qcSummary": qc_summary,
-        }
-        if merged_info is not None:
-            final_payload["mergedKey"] = merged_info["fileKey"]
-        emit(rpub, channel, final_payload)
-    except Exception as exc:  # noqa: BLE001
-        if not _is_final_error_published(rpub, channel):
-            error_payload = {
+        manifest.update({
+            "qcKey": qc_key,
+            "qcBlock": qc,
+            "qcSummary": summary,
+        })
+
+        manifest_key = f"blocks/{block_id}/manifest.json"
+        put_object_json(manifest_key, manifest)
+
+        if status == "done":
+            print(f"final.done jobId={job_id} blockId={block_id} rowsOk={rows_ok} rowsFail={rows_fail} mixKey={mix_key} qcKey={qc_key}")
+        else:
+            print(f"final.error jobId={job_id} blockId={block_id} rowsOk={rows_ok} rowsFail={rows_fail} reason={reason}")
+
+        if channel:
+            emit(rpub, channel, {
+                "type": "final",
+                "state": status,
+                "manifestKey": manifest_key,
+                "qcBlock": qc,
+                "qcKey": qc_key,
+                "qcSummary": summary,
+                "mixKey": mix_key,
+                "rowsOk": rows_ok,
+                "rowsFail": rows_fail,
+                "reason": reason,
+            })
+
+        if status == "error":
+            raise RuntimeError(f"block QC failed: {reason}")
+    except Exception as exc:
+        if channel and not _is_final_error_published(rpub, channel):
+            emit(rpub, channel, {
                 "type": "final",
                 "state": "error",
                 "error": str(exc),
-            }
-            if current_index is not None:
-                error_payload["atRow"] = current_index
-            emit(rpub, channel, error_payload)
+                "atRow": current_index,
+            })
         raise
     finally:
         try:
@@ -217,44 +220,48 @@ def emit(rpub: Redis, channel: str, payload: dict):
     rpub.publish(channel, message)
     try:
         rpub.setex(f"{channel}:last", SNAPSHOT_TTL_SEC, message)
-    except Exception:  # noqa: BLE001 - snapshot best-effort
+    except Exception:
         pass
 
 
-def _format_metrics(raw: Dict[str, Any], warnings: List[str], score: float) -> Dict[str, Any]:
-    lufs = raw.get("lufsIntegrated")
-    if lufs in (None, float('-inf'), float('inf')):
-        lufs_value = lufs
-    else:
-        lufs_value = round(lufs, 2)
-    true_peak = raw.get("truePeakDb")
-    if true_peak in (None, float('-inf'), float('inf')):
-        peak_value = true_peak
-    else:
-        peak_value = round(true_peak, 2)
-    return {
-        "lufsIntegrated": lufs_value,
-        "truePeakDb": peak_value,
-        "clippingPct": round(raw.get("clippingPct", 0.0), 2),
-        "score": round(score, 3),
-        "warnings": warnings,
-    }
+def _finalize_status(qc_block: Dict[str, Any], rows_fail: int) -> Tuple[str, str]:
+    warnings = qc_block.setdefault("warnings", [])
 
+    if rows_fail > 0:
+        return "error", "rows_fail>0"
 
-def _format_qc_error(warnings: List[str], score: float, prefix: Optional[str] = None) -> str:
-    parts = warnings[:] if warnings else []
-    if not parts:
-        parts.append(f"score {score:.2f} < min {THRESHOLDS.score_min:.2f}")
-    reason = "; ".join(parts)
-    if prefix:
-        return f"{prefix} QC threshold failed: {reason}"
-    return f"QC threshold failed: {reason}"
+    if not settings.HQ_ENABLED:
+        if HQ_DISABLED_MSG not in warnings:
+            warnings.append(HQ_DISABLED_MSG)
+        return "done", "hq_disabled"
+
+    ok = qc_block.get("pass")
+    if ok is None:
+        ok = within_threshold(
+            qc_block,
+            settings.TARGET_LUFS,
+            settings.LUFS_TOL,
+            settings.TRUEPEAK_MAX_DBTP,
+        )
+        qc_block["pass"] = ok
+
+    if ok:
+        return "done", "qc_ok"
+
+    if settings.QC_OVERRIDE_DEV:
+        if OVERRIDE_MSG_EXACT not in warnings:
+            warnings.append(OVERRIDE_MSG_EXACT)
+        if not any("override" in str(w).lower() for w in warnings):
+            warnings.append(OVERRIDE_MSG_SUB)
+        return "done", "qc_override_dev"
+
+    return "error", "qc_threshold_failed"
 
 
 def _build_summary(row_results: List[Dict[str, Any]]) -> Dict[str, Any]:
     rows_pass = sum(1 for row in row_results if row.get("passed"))
     rows_fail = len(row_results) - rows_pass
-    total_duration = sum(row["durationMs"] for row in row_results) or 0.0
+    total_duration = sum(row.get("durationMs", 0.0) or 0.0 for row in row_results) or 0.0
 
     block_lufs = None
     block_clipping = None
@@ -265,13 +272,13 @@ def _build_summary(row_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         clipping_sum = 0.0
         peak = float('-inf')
         for row in row_results:
-            metrics = row["metrics"]
-            duration = row["durationMs"]
+            metrics = row.get("metrics", {})
+            duration = row.get("durationMs", 0.0) or 0.0
             lufs = metrics.get("lufsIntegrated")
-            if lufs not in (None, float('-inf'), float('inf')):
-                lufs_sum += lufs * duration
+            if isinstance(lufs, (int, float)):
+                lufs_sum += float(lufs) * duration
                 lufs_weight += duration
-            clipping_sum += metrics.get("clippingPct", 0.0) * duration
+            clipping_sum += (metrics.get("clippingPct", 0.0) or 0.0) * duration
             peak = max(peak, metrics.get("truePeakDb", float('-inf')))
         if lufs_weight > 0:
             block_lufs = lufs_sum / lufs_weight
@@ -303,3 +310,6 @@ def _is_final_error_published(rpub: Redis, channel: str) -> bool:
     except json.JSONDecodeError:
         return False
     return payload.get("type") == "final" and payload.get("state") == "error"
+
+
+__all__ = ["process_block_job", "_finalize_status"]

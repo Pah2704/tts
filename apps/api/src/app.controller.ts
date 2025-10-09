@@ -15,4 +15,9 @@ export class AppController {
   hello() {
     return this.appService.getHello();
   }
+
+  @Get('/health')
+  health() {
+    return { ok: true, ts: Date.now() };
+  }
 }
