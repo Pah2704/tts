@@ -20,10 +20,13 @@ jobs:
           --health-interval=3s
           --health-retries=5
       minio:
-        image: quay.io/minio/minio:latest
+        image: bitnami/minio:2024
         env:
           MINIO_ROOT_USER: minio
           MINIO_ROOT_PASSWORD: minio123
+          MINIO_DEFAULT_BUCKETS: tts-vtn
+          MINIO_API_PORT_NUMBER: "9000"
+          MINIO_CONSOLE_PORT_NUMBER: "9001"
         ports:
           - 9000:9000
           - 9001:9001
@@ -31,7 +34,6 @@ jobs:
           --health-cmd="curl -f http://localhost:9000/minio/health/live || exit 1"
           --health-interval=5s
           --health-retries=6
-        command: server /data --console-address ":9001"
 
     env:
       REDIS_URL: redis://localhost:6379
