@@ -8,6 +8,7 @@ type Row = { rowId: string, text: string };
 type Block = { id: string, projectId: string, kind: 'mono'|'dialog', speaker?: string|null, rows: Row[], text: string };
 
 const MEM_DB = new Map<string, Block>();
+const MANIFEST_DB = new Map<string, unknown>();
 
 @Injectable()
 export class BlocksService {
@@ -37,5 +38,14 @@ export class BlocksService {
     const cur = MEM_DB.get(id);
     if (!cur) throw new Error('BlockNotFound');
     return cur;
+  }
+
+  async setManifest(id: string, manifest: unknown) {
+    MANIFEST_DB.set(id, manifest);
+    console.log('[blocks] manifest set for id=', id);
+  }
+
+  async getManifest(id: string) {
+    return MANIFEST_DB.get(id) ?? null;
   }
 }

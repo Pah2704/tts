@@ -209,40 +209,43 @@ jobs:
 
           echo "--- E2E job smoke ---"
           python - <<'PY'
-import json, os, time, urllib.error, urllib.request
+          import json, os, time, urllib.error, urllib.request
 
-BASE = os.environ.get("API_BASE", "http://127.0.0.1:4000")
+          BASE = os.environ.get("API_BASE", "http://127.0.0.1:4000")
 
-def post(path, payload):
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        BASE + path,
-        data=data,
-        headers={"Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read().decode())
 
-def get(path):
-    with urllib.request.urlopen(BASE + path, timeout=10) as resp:
-        return json.loads(resp.read().decode())
+          def post(path, payload):
+              data = json.dumps(payload).encode("utf-8")
+              req = urllib.request.Request(
+                  BASE + path,
+                  data=data,
+                  headers={"Content-Type": "application/json"},
+              )
+              with urllib.request.urlopen(req, timeout=10) as resp:
+                  return json.loads(resp.read().decode())
 
-block = post("/blocks", {"text": "CI quick smoke"})
-job = post("/jobs/tts", {"blockId": block["id"]})
 
-state = "unknown"
-for _ in range(90):
-    status = get(f"/jobs/{job['jobId']}/status")
-    state = status.get("state", "unknown")
-    if state in ("done", "error"):
-        break
-    time.sleep(1)
+          def get(path):
+              with urllib.request.urlopen(BASE + path, timeout=10) as resp:
+                  return json.loads(resp.read().decode())
 
-if state != "done":
-    raise SystemExit(f"Job did not complete: state={state}")
 
-print("E2E job completed with state=done")
-PY
+          block = post("/blocks", {"text": "CI quick smoke"})
+          job = post("/jobs/tts", {"blockId": block["id"]})
+
+          state = "unknown"
+          for _ in range(90):
+              status = get(f"/jobs/{job['jobId']}/status")
+              state = status.get("state", "unknown")
+              if state in ("done", "error"):
+                  break
+              time.sleep(1)
+
+          if state != "done":
+              raise SystemExit(f"Job did not complete: state={state}")
+
+          print("E2E job completed with state=done")
+          PY
 
           # --- Run tests ---
           set +e

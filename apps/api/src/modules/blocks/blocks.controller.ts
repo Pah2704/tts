@@ -23,8 +23,12 @@ export class BlocksController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateBlockDto) {
-    return this.svc.update(id, dto);
+  async update(@Param('id') id: string, @Body() body: any) {
+    if (body?.manifest) {
+      await this.svc.setManifest(id, body.manifest);
+      return { ok: true };
+    }
+    return this.svc.update(id, body as UpdateBlockDto);
   }
 
   @Get(':id')
@@ -34,6 +38,9 @@ export class BlocksController {
 
   @Get(':id/manifest')
   async getManifest(@Param('id') id: string) {
+    const cached = await this.svc.getManifest(id);
+    if (cached) return cached;
+
     const manifestKey = `blocks/${id}/manifest.json`;
     const notReady = () =>
       new NotFoundException({
