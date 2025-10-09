@@ -12,6 +12,7 @@ import { Request, Response } from 'express';
 import IORedis from 'ioredis';
 import { JobsService } from './jobs.service';
 import { CreateTtsJobDto, TtsJobPayload } from './jobs.dto';
+import { jobSnapshotKey } from './jobs.queue';
 import { BlocksService } from '../blocks/blocks.service';
 
 const redisOpts = { maxRetriesPerRequest: null as any, enableReadyCheck: false };
@@ -125,6 +126,7 @@ export class JobsController {
   @Get(':id/status')
   async status(@Param('id') id: string) {
     let snapshot: any = null;
+    let jobSnap: any = null;
     try {
       const ch = `progress:${id}`;
       const cached = await this.kv.get(`${ch}:last`);
@@ -133,17 +135,25 @@ export class JobsController {
       }
     } catch {}
 
+    try {
+      const raw = await this.kv.get(jobSnapshotKey(id));
+      if (raw) {
+        jobSnap = JSON.parse(raw);
+      }
+    } catch {}
+
     const job = await this.svc.get(id);
     if (!job) {
       return {
         id,
-        state: snapshot?.state ?? 'waiting',
+        state: jobSnap?.state ?? snapshot?.state ?? 'waiting',
         found: false,
         snapshot: snapshot ?? null,
+        jobSnapshot: jobSnap ?? null,
       };
     }
 
-    let state = snapshot?.state as string | undefined;
+    let state = jobSnap?.state as string | undefined ?? snapshot?.state as string | undefined;
     if (!state) {
       try {
         const jobState = await job.getState();
@@ -160,6 +170,7 @@ export class JobsController {
       state: state ?? 'unknown',
       found: true,
       snapshot: snapshot ?? null,
+      jobSnapshot: jobSnap ?? null,
     };
   }
 }

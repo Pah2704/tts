@@ -5,7 +5,8 @@ import { startTtsWorker } from './modules/jobs/jobs.queue';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });
-  await app.listen(process.env.API_PORT || 4000);
+  const port = +(process.env.API_PORT ?? 4000);
+  await app.listen(port);
 
   // Chỉ bật khi debug host-mode
   if (process.env.API_INLINE_WORKER === '1') {

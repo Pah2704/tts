@@ -1,32 +1,32 @@
 import { Job, Queue, Worker } from 'bullmq';
 import IORedis, { RedisOptions } from 'ioredis';
 import { TtsJobPayload } from './jobs.dto';
-import { connectionUrl, makeTtsQueue, prefix, TTS_QUEUE } from './queue.config';
+import { makeTtsQueue, prefix, TTS_QUEUE, queueConnection, queueConfig, redisEndpoint } from './queue.config';
 
-const redisOpts: RedisOptions = {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-};
+const redisOpts: RedisOptions = { ...queueConnection };
 
-const connectionOptions = {
-  url: connectionUrl,
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-};
-
-const pub = new IORedis(connectionUrl, redisOpts);
+const pub = new IORedis(redisOpts);
 
 export const ttsQueueName = TTS_QUEUE;
 export const ttsQueue: Queue<TtsJobPayload> = makeTtsQueue();
 
 export const SNAPSHOT_TTL_SEC = Number(process.env.SNAPSHOT_TTL_SEC ?? 900);
+export const JOB_SNAPSHOT_TTL_SEC = Number(process.env.JOB_SNAPSHOT_TTL_SEC ?? 60);
+const JOB_SNAPSHOT_PREFIX = 'bull:snap:job:';
 
 export async function enqueueTtsJob(payload: TtsJobPayload): Promise<{ jobId: string }> {
   const job = await ttsQueue.add('block', payload, {
     attempts: Number(process.env.QUEUE_ATTEMPTS ?? 2),
     backoff: { type: 'fixed', delay: Number(process.env.QUEUE_BACKOFF_MS ?? 2000) },
   });
-  return { jobId: String(job.id) };
+  const jobId = String(job.id);
+  await setJobSnapshot(jobId, 'waiting', {
+    queue: queueConfig.ttsQueueName,
+    prefix,
+    redis: redisEndpoint,
+    blockId: payload.blockId,
+  });
+  return { jobId };
 }
 
 export function getTtsJob(jobId: string) {
@@ -48,10 +48,10 @@ export function startTtsWorker() {
         throw new Error('rows missing or empty');
       }
       const total = rows.length;
-      const channel = `progress:${job.id}`;
+      const jobId = String(job.id);
 
       for (let i = 0; i < total; i++) {
-        await emit(channel, {
+        await emit(jobId, {
           type: 'row',
           rowIndex: i,
           total,
@@ -65,7 +65,7 @@ export function startTtsWorker() {
           score: 0.9,
           warnings: [] as string[],
         };
-        await emit(channel, {
+        await emit(jobId, {
           type: 'row',
           rowIndex: i,
           total,
@@ -77,7 +77,7 @@ export function startTtsWorker() {
         });
       }
 
-      await emit(channel, {
+      await emit(jobId, {
         type: 'final',
         state: 'done',
         manifestKey: `blocks/${job.data.blockId}/manifest.json`,
@@ -92,17 +92,44 @@ export function startTtsWorker() {
       return { ok: true };
     },
     {
-      connection: connectionOptions,
+      connection: { ...queueConnection },
       prefix,
       concurrency,
     },
   );
 }
 
-async function emit(channel: string, payload: Record<string, unknown>) {
+async function emit(jobId: string, payload: Record<string, unknown>) {
   const serialized = JSON.stringify(payload);
-  await pub.publish(channel, serialized);
-  await pub.set(`${channel}:last`, serialized, 'EX', SNAPSHOT_TTL_SEC);
+  const channelName = `progress:${jobId}`;
+  await pub.publish(channelName, serialized);
+  await pub.set(`${channelName}:last`, serialized, 'EX', SNAPSHOT_TTL_SEC);
+  const state = typeof payload.state === 'string' ? payload.state : undefined;
+  if (state) {
+    await setJobSnapshot(jobId, mapState(state), { payload });
+  }
 }
 
-export { connectionOptions as workerConnectionOptions };
+function mapState(state: string): string {
+  if (state === 'completed' || state === 'done') return 'done';
+  if (state === 'failed' || state === 'error') return 'error';
+  if (state === 'running') return 'running';
+  if (state === 'waiting') return 'waiting';
+  return state;
+}
+
+export function jobSnapshotKey(jobId: string): string {
+  return `${JOB_SNAPSHOT_PREFIX}${jobId}`;
+}
+
+export async function setJobSnapshot(jobId: string, state: string, extra: Record<string, unknown> = {}) {
+  const snapshot = JSON.stringify({
+    jobId,
+    state: mapState(state),
+    updatedAt: new Date().toISOString(),
+    ...extra,
+  });
+  await pub.set(jobSnapshotKey(jobId), snapshot, 'EX', JOB_SNAPSHOT_TTL_SEC);
+}
+
+export { queueConfig };

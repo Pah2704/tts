@@ -128,7 +128,6 @@ jobs:
           API_BASE: http://127.0.0.1:4000
           NODE_ENV: test
           TZ: UTC
-          TTS_INLINE_WORKER: "1"
           REDIS_URL: redis://127.0.0.1:6379
           BULLMQ_CONNECTION: redis://127.0.0.1:6379
           BULL_REDIS_URL: redis://127.0.0.1:6379
@@ -168,17 +167,26 @@ jobs:
           API_PID=$!
           popd >/dev/null
 
-          # --- Wait for API up (IPv4) ---
+          healthy=0
           for i in {1..60}; do
-            if curl -sf "http://127.0.0.1:${API_PORT}/health" >/dev/null || \
-               curl -sf "http://127.0.0.1:${API_PORT}/" >/dev/null; then
-              echo "API is up on :${API_PORT}"
+            if curl -sf "http://127.0.0.1:${API_PORT}/healthz" >/dev/null; then
+              echo "API healthz OK on :${API_PORT}"
+              healthy=1
               break
             fi
-            echo "waiting API ($i/60)"; sleep 1
+            echo "waiting API healthz ($i/60)"; sleep 1
           done
+          if [[ $healthy -ne 1 ]]; then
+            echo "❌ API healthz did not become ready"; tail -n 200 "$GITHUB_WORKSPACE/api.log" || true; exit 1
+          fi
+
+          node apps/api/dist/modules/jobs/worker.js >"$GITHUB_WORKSPACE/worker.log" 2>&1 &
+          WORKER_PID=$!
+          sleep 0.5
 
           curl -sSf "${API_BASE}/hello" || true
+          docker exec "${GITHUB_JOB}-redis" redis-cli -p 6379 PING | grep -q PONG
+          echo "Redis ping OK"
           echo "--- Redis keys (bull*) ---"
           docker exec "${GITHUB_JOB}-redis" redis-cli --scan --pattern "bull:*" | sort | head -n 40 || true
           echo "--- Redis keys (*:tts:*) ---"
@@ -187,11 +195,54 @@ jobs:
           docker exec "${GITHUB_JOB}-redis" redis-cli --scan --pattern "*:wait" | sort | head -n 40 || true
           echo "--- Redis keys (*:meta) ---"
           docker exec "${GITHUB_JOB}-redis" redis-cli --scan --pattern "*:meta" | sort | head -n 40 || true
+          echo "--- Redis keys (bull:snap:*) ---"
+          docker exec "${GITHUB_JOB}-redis" redis-cli --scan --pattern "bull:snap:*" | sort | head -n 40 || true
+          echo "--- Redis keys (keys bull*) ---"
+          docker exec "${GITHUB_JOB}-redis" redis-cli keys 'bull*' | head -n 40 || true
+          echo "--- Redis keys (keys bull:snap:*) ---"
+          docker exec "${GITHUB_JOB}-redis" redis-cli keys 'bull:snap:*' | head -n 40 || true
           echo "--- Redis queue cardinalities ---"
           docker exec "${GITHUB_JOB}-redis" redis-cli llen bull:tts_block:wait || true
           docker exec "${GITHUB_JOB}-redis" redis-cli zcard bull:tts_block:delayed || true
           docker exec "${GITHUB_JOB}-redis" redis-cli scard bull:tts_block:active || true
           docker exec "${GITHUB_JOB}-redis" redis-cli scard bull:tts_block:completed || true
+
+          echo "--- E2E job smoke ---"
+          python - <<'PY'
+import json, os, time, urllib.error, urllib.request
+
+BASE = os.environ.get("API_BASE", "http://127.0.0.1:4000")
+
+def post(path, payload):
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        BASE + path,
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode())
+
+def get(path):
+    with urllib.request.urlopen(BASE + path, timeout=10) as resp:
+        return json.loads(resp.read().decode())
+
+block = post("/blocks", {"text": "CI quick smoke"})
+job = post("/jobs/tts", {"blockId": block["id"]})
+
+state = "unknown"
+for _ in range(90):
+    status = get(f"/jobs/{job['jobId']}/status")
+    state = status.get("state", "unknown")
+    if state in ("done", "error"):
+        break
+    time.sleep(1)
+
+if state != "done":
+    raise SystemExit(f"Job did not complete: state={state}")
+
+print("E2E job completed with state=done")
+PY
 
           # --- Run tests ---
           set +e
@@ -201,8 +252,13 @@ jobs:
 
           echo "---- API LOG (tail) ----"
           tail -n 200 "$GITHUB_WORKSPACE/api.log" || true
+          echo "---- WORKER LOG (tail) ----"
+          tail -n 200 "$GITHUB_WORKSPACE/worker.log" || true
 
           kill "$API_PID" 2>/dev/null || true
+          if [ -n "${WORKER_PID:-}" ]; then
+            kill "$WORKER_PID" 2>/dev/null || true
+          fi
           exit ${TEST_RC}
 
       - name: Build Frontend

@@ -3,9 +3,15 @@
   "version": "v0.6.0-day7",
   "private": true,
   "scripts": {
-    "start": "node dist/main.js",
-    "dev": "ts-node-dev -r dotenv/config --respawn --transpile-only src/main.ts",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "start:api": "API_PORT=${API_PORT:-4000} node dist/main.js",
+    "start:worker": "node dist/modules/jobs/worker.js",
+    "start:all": "pnpm -w -F tts-vtn-api build && API_PORT=${API_PORT:-4000} node dist/main.js & echo $! > /tmp/api.pid && node dist/modules/jobs/worker.js & echo $! > /tmp/worker.pid",
+    "stop:all": "bash -lc 'for f in /tmp/api.pid /tmp/worker.pid; do if [ -s \"$f\" ]; then kill \"$(cat \"$f\")\" 2>/dev/null || true; rm -f \"$f\"; fi; done; pkill -f \"apps/api/dist/main.js\" 2>/dev/null || true; pkill -f \"modules/jobs/worker.js\" 2>/dev/null || true'",
+    "infra:redis": "docker run -d --rm --name redis-tts -p 6379:6379 redis:7-alpine",
+    "dev:api": "ts-node-dev -r dotenv/config --respawn --transpile-only src/main.ts",
+    "dev:worker": "ts-node-dev -r dotenv/config --respawn --transpile-only src/modules/jobs/worker.ts",
+    "test": "pnpm -w -F tts-vtn-api build && pnpm -w -r test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.637.0",
@@ -25,8 +31,8 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
     "@types/jest": "^30.0.0",
-    "@types/supertest": "^6.0.3",
     "@types/node": "^20.14.2",
+    "@types/supertest": "^6.0.3",
     "jest": "^30.2.0",
     "supertest": "^7.0.0",
     "ts-jest": "^29.4.4",
